@@ -1,0 +1,25 @@
+mkdir -p ~/backups
+pg_dump -Fc -f ~/backups/bootcamp.dump bootcamp
+pg_restore --list ~/backups/bootcamp.dump
+createdb bootcamp_check && pg_restore -d bootcamp_check ~/backups/bootcamp.dump
+mkdir -p ~/backups/wal
+sudo nano /etc/postgresql/14/main/postgresql.conf
+wal_level = replica
+archive_mode = on
+archive_command = 'cp %p /home/$USER/backups/wal/%f'
+sudo systemctl restart postgresql
+pg_basebackup -D ~/backups/base -Ft -z
+psql -d bootcamp
+SELECT now();  -- Record the exact output timestamp (e.g., 2026-10-07 10:15:00)
+DELETE FROM students; -- oops!
+\q
+sudo systemctl stop postgresql
+sudo rm -rf /var/lib/postgresql/14/main/*
+sudo tar -xvf ~/backups/base/base.tar -C /var/lib/postgresql/14/main/
+sudo nano /var/lib/postgresql/14/main/postgresql.conf
+restore_command = 'cp /home/$USER/backups/wal/%f %p'
+recovery_target_time = '2026-10-07 10:15:00'
+sudo touch /var/lib/postgresql/14/main/recovery.signal
+sudo chown postgres:postgres /var/lib/postgresql/14/main/recovery.signal
+sudo systemctl start postgresql
+psql -d bootcamp -c "SELECT COUNT(*) FROM students;"
